@@ -7,6 +7,8 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
+import android.graphics.Paint.Style;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -33,6 +35,7 @@ public class ToneCircleView extends View {
 	private Paint textPaint;
 	private Paint beadPaint;
 	private Paint activeBeadPaint;
+	private Paint chordPaint;
 
 	private Rect textRect = new Rect();
 
@@ -63,7 +66,10 @@ public class ToneCircleView extends View {
 		hsvColor[2] = 0.7f;
 		int activeColor = Color.HSVToColor(hsvColor);
 		activeBeadPaint.setColor(activeColor);
-		activeBeadPaint.setStrokeWidth(5);
+
+		chordPaint = new Paint(activeBeadPaint);
+		chordPaint.setStyle(Style.STROKE);
+		chordPaint.setStrokeWidth(5);
 	}
 
 	public BitSet getActiveTones() {
@@ -116,21 +122,72 @@ public class ToneCircleView extends View {
 		canvas.drawCircle(beadApexPoints[xIndex],
 			beadApexPoints[yIndex],
 			10f,
-			activeBeadPaint);
+			chordPaint);
 	}
 
 	private void drawActivePolygon(Canvas canvas) {
+		// int length = activeTones.cardinality();
+		// int first = activeTones.nextSetBit(0);
+		// int from = first;
+		// for (int i = 1; i < length; i++) {
+		// int to = activeTones.nextSetBit(from + 1);
+		// drawPolygonLine(canvas, from, to);
+		// from = to;
+		// }
+		// if (length >= 3) {
+		// drawPolygonLine(canvas, from, first);
+		// }
+
+		Path path = new Path();
+
 		int length = activeTones.cardinality();
+		if (length <= 1) {
+			return;
+		}
+
+		chordPaint.setStyle(length > 2 ? Style.FILL_AND_STROKE : Style.STROKE);
+
 		int first = activeTones.nextSetBit(0);
 		int from = first;
+		float firstX = beadApexPoints[2 * first];
+		float firstY = beadApexPoints[2 * first + 1];
+		path.moveTo(firstX, firstY);
+		float prevX = firstX;
+		float prevY = firstY;
 		for (int i = 1; i < length; i++) {
 			int to = activeTones.nextSetBit(from + 1);
-			drawPolygonLine(canvas, from, to);
+			int interval = intervalClass(from, to);
+			float stiffness = 1 - interval / 6.0f;
+
+			float x = beadApexPoints[2 * to];
+			float y = beadApexPoints[2 * to + 1];
+			float midX = (x + prevX) * 0.5f * stiffness;
+			float midY = (y + prevY) * 0.5f * stiffness;
+			path.quadTo(midX, midY, x, y);
 			from = to;
+			prevX = x;
+			prevY = y;
 		}
+
 		if (length >= 3) {
-			drawPolygonLine(canvas, from, first);
+			int interval = intervalClass(first, from);
+			float stiffness = 1 - interval / 6.0f;
+			float midX = (firstX + prevX) * 0.5f * stiffness;
+			float midY = (firstY + prevY) * 0.5f * stiffness;
+			path.quadTo(midX, midY, firstX, firstY);
 		}
+
+		canvas.drawPath(path, chordPaint);
+	}
+
+	private int intervalClass(int one, int other) {
+		int interval = mod(one - other, TONE_COUNT);
+		int HALF = TONE_COUNT / 2;
+		return (interval > HALF) ? TONE_COUNT - interval : interval;
+	}
+
+	private int mod(int value, int base) {
+		return ((value % base) + base) % base;
 	}
 
 	private void drawPolygonLine(Canvas canvas, int from, int to) {
@@ -154,7 +211,8 @@ public class ToneCircleView extends View {
 		float windowRadius = 0.5f * (float) Math.min(w, h);
 		beadRadius = 0.19f * windowRadius;
 		bigRadius = 0.8f * windowRadius;
-		float apexRadius = 0.9f * (bigRadius - beadRadius);
+		float apexRadius = bigRadius - beadRadius;
+		// apexRadius *= 0.9f;
 
 		float toneCountInv = 1.0f / TONE_COUNT;
 		for (int i = 0, xIndex = 0; i < TONE_COUNT; i++, xIndex += 2) {
