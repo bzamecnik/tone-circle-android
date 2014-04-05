@@ -1,5 +1,7 @@
 package com.harmoneye.tonecircle;
 
+import java.util.BitSet;
+
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
@@ -22,7 +24,7 @@ public class ToneCircleView extends View {
 		"F", "Gb", "G", "Ab", "A", "Bb", "B" };
 
 	// the model
-	boolean[] activeTones = new boolean[TONE_COUNT];
+	BitSet activeTones = new BitSet(TONE_COUNT);
 
 	// x, y coordinates of bead centers
 	float[] centers = new float[TONE_COUNT * 2];
@@ -64,11 +66,11 @@ public class ToneCircleView extends View {
 		activeBeadPaint.setColor(activeColor);
 	}
 
-	public boolean[] getActiveTones() {
+	public BitSet getActiveTones() {
 		return activeTones;
 	}
 
-	public void setActiveTones(boolean[] activeTones) {
+	public void setActiveTones(BitSet activeTones) {
 		this.activeTones = activeTones;
 		invalidate();
 	}
@@ -92,7 +94,7 @@ public class ToneCircleView extends View {
 			canvas.drawCircle(x,
 				y,
 				beadRadius,
-				activeTones[i] ? activeBeadPaint : beadPaint);
+				activeTones.get(i) ? activeBeadPaint : beadPaint);
 
 			String toneName = TONE_NAMES[i];
 			textPaint.getTextBounds(toneName, 0, toneName.length(), textRect);
@@ -146,23 +148,30 @@ public class ToneCircleView extends View {
 		float y = event.getY(pointerIndex);
 		switch (event.getActionMasked()) {
 		case MotionEvent.ACTION_DOWN:
-			touchedTone = getSelectedTone(x, y);
+			touchedTone = getHoveredTone(x, y);
 			invalidate();
 			break;
 		case MotionEvent.ACTION_UP:
-			Integer selectedTone = getSelectedTone(x, y);
-			if (selectedTone != null && selectedTone.equals(touchedTone)) {
-				activeTones[selectedTone] = !activeTones[selectedTone];
+			if (touchedTone != null) {
+				Integer hoveredTone = getHoveredTone(x, y);
+				if (hoveredTone == null) {
+					activeTones.clear(touchedTone);
+				} else if (hoveredTone.equals(touchedTone)) {
+					activeTones.flip(hoveredTone);
+				} else {
+					activeTones.set(hoveredTone, activeTones.get(touchedTone));
+					activeTones.clear(touchedTone);
+				}
 				touchedTone = null;
+				invalidate();
 			}
-			invalidate();
 			break;
 		}
 
 		return true;
 	}
 
-	private Integer getSelectedTone(float x, float y) {
+	private Integer getHoveredTone(float x, float y) {
 		float cy = y - height * 0.5f;
 		double cx = x - width * 0.5;
 		double angle = Math.atan2(cy, cx);
