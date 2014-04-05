@@ -7,7 +7,6 @@ import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Paint.Align;
-import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
@@ -28,6 +27,8 @@ public class ToneCircleView extends View {
 
 	// x, y coordinates of bead centers
 	float[] centers = new float[TONE_COUNT * 2];
+	// x, y coordinates of connection points
+	float[] beadApexPoints = new float[TONE_COUNT * 2];
 
 	private Paint textPaint;
 	private Paint beadPaint;
@@ -42,28 +43,27 @@ public class ToneCircleView extends View {
 
 	private Integer touchedTone;
 
-	// private double touchedAngle;
-
 	public ToneCircleView(Context context, AttributeSet attrs) {
 		super(context, attrs);
 
 		textPaint = new Paint();
 		textPaint.setColor(Color.WHITE);
-		//textPaint.setStyle(Style.STROKE);
 		textPaint.setTextAlign(Align.CENTER);
 		textPaint.setAntiAlias(true);
 
 		beadPaint = new Paint();
 		beadPaint.setAntiAlias(true);
 
-		float[] hsvColor = new float[] { 360 * 0.25f, 0.25f, 0.85f };
+		float[] hsvColor = new float[] { 360 * 0.25f, 0.15f, 0.9f };
 		int color = Color.HSVToColor(hsvColor);
 		beadPaint.setColor(color);
 
 		activeBeadPaint = new Paint(beadPaint);
-		hsvColor[2] = 0.6f;
+		hsvColor[1] = 0.5f;
+		hsvColor[2] = 0.7f;
 		int activeColor = Color.HSVToColor(hsvColor);
 		activeBeadPaint.setColor(activeColor);
+		activeBeadPaint.setStrokeWidth(5);
 	}
 
 	public BitSet getActiveTones() {
@@ -88,9 +88,10 @@ public class ToneCircleView extends View {
 
 		textPaint.setTextSize(beadRadius);
 
-		for (int i = 0; i < TONE_COUNT; i++) {
-			float x = centers[2 * i];
-			float y = centers[2 * i + 1];
+		for (int i = 0, xIndex = 0; i < TONE_COUNT; i++, xIndex += 2) {
+			int yIndex = xIndex + 1;
+			float x = centers[xIndex];
+			float y = centers[yIndex];
 			canvas.drawCircle(x,
 				y,
 				beadRadius,
@@ -102,19 +103,44 @@ public class ToneCircleView extends View {
 				x,
 				y + textRect.height() * 0.5f,
 				textPaint);
+
+			// drawBeadApex(canvas, xIndex, yIndex);
 		}
 
-		// canvas.drawLine(0,
-		// 0,
-		// (float) (bigRadius * Math.cos(touchedAngle)),
-		// (float) (bigRadius * Math.sin(touchedAngle)),
-		// textPaint);
-		//
-		// String toneName = String.valueOf(touchedTone);
-		// textPaint.getTextBounds(toneName, 0, toneName.length(), textRect);
-		// canvas.drawText(toneName, 0, textRect.height() * 0.5f, textPaint);
+		drawActivePolygon(canvas);
 
 		canvas.restore();
+	}
+
+	private void drawBeadApex(Canvas canvas, int xIndex, int yIndex) {
+		canvas.drawCircle(beadApexPoints[xIndex],
+			beadApexPoints[yIndex],
+			10f,
+			activeBeadPaint);
+	}
+
+	private void drawActivePolygon(Canvas canvas) {
+		int length = activeTones.cardinality();
+		int first = activeTones.nextSetBit(0);
+		int from = first;
+		for (int i = 1; i < length; i++) {
+			int to = activeTones.nextSetBit(from + 1);
+			drawPolygonLine(canvas, from, to);
+			from = to;
+		}
+		if (length >= 3) {
+			drawPolygonLine(canvas, from, first);
+		}
+	}
+
+	private void drawPolygonLine(Canvas canvas, int from, int to) {
+		float fromX = beadApexPoints[2 * from];
+		float fromY = beadApexPoints[2 * from + 1];
+		float toX = beadApexPoints[2 * to];
+		float toY = beadApexPoints[2 * to + 1];
+		canvas.drawLine(fromX, fromY, toX, toY, activeBeadPaint);
+		drawBeadApex(canvas, 2 * from, 2 * from + 1);
+		drawBeadApex(canvas, 2 * to, 2 * to + 1);
 	}
 
 	@Override
@@ -128,16 +154,21 @@ public class ToneCircleView extends View {
 		float windowRadius = 0.5f * (float) Math.min(w, h);
 		beadRadius = 0.19f * windowRadius;
 		bigRadius = 0.8f * windowRadius;
+		float apexRadius = 0.9f * (bigRadius - beadRadius);
 
 		float toneCountInv = 1.0f / TONE_COUNT;
-		for (int i = 0; i < TONE_COUNT; i++) {
+		for (int i = 0, xIndex = 0; i < TONE_COUNT; i++, xIndex += 2) {
+			int yIndex = xIndex + 1;
 			float p = i * toneCountInv;
 
 			double angle = p * TWO_PI - HALF_PI;
-			float x = bigRadius * (float) Math.cos(angle);
-			float y = bigRadius * (float) Math.sin(angle);
-			centers[2 * i] = x;
-			centers[2 * i + 1] = y;
+			float x = (float) Math.cos(angle);
+			float y = (float) Math.sin(angle);
+			centers[xIndex] = bigRadius * x;
+			centers[yIndex] = bigRadius * y;
+
+			beadApexPoints[xIndex] = apexRadius * x;
+			beadApexPoints[yIndex] = apexRadius * y;
 		}
 	}
 
