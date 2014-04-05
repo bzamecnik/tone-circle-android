@@ -113,31 +113,17 @@ public class ToneCircleView extends View {
 			// drawBeadApex(canvas, xIndex, yIndex);
 		}
 
-		drawActivePolygon(canvas);
+		drawActiveChord(canvas);
 
 		canvas.restore();
 	}
 
-	private void drawBeadApex(Canvas canvas, int xIndex, int yIndex) {
-		canvas.drawCircle(beadApexPoints[xIndex],
-			beadApexPoints[yIndex],
-			10f,
-			chordPaint);
+	private void drawActiveChord(Canvas canvas) {
+		// drawActiveChordAsPolygon(canvas);
+		drawActiveChordAsQuadPath(canvas);
 	}
 
-	private void drawActivePolygon(Canvas canvas) {
-		// int length = activeTones.cardinality();
-		// int first = activeTones.nextSetBit(0);
-		// int from = first;
-		// for (int i = 1; i < length; i++) {
-		// int to = activeTones.nextSetBit(from + 1);
-		// drawPolygonLine(canvas, from, to);
-		// from = to;
-		// }
-		// if (length >= 3) {
-		// drawPolygonLine(canvas, from, first);
-		// }
-
+	private void drawActiveChordAsQuadPath(Canvas canvas) {
 		Path path = new Path();
 
 		int length = activeTones.cardinality();
@@ -156,28 +142,29 @@ public class ToneCircleView extends View {
 		float prevY = firstY;
 		for (int i = 1; i < length; i++) {
 			int to = activeTones.nextSetBit(from + 1);
-			int interval = intervalClass(from, to);
-			float stiffness = 1 - interval / 6.0f;
-
 			float x = beadApexPoints[2 * to];
 			float y = beadApexPoints[2 * to + 1];
-			float midX = (x + prevX) * 0.5f * stiffness;
-			float midY = (y + prevY) * 0.5f * stiffness;
-			path.quadTo(midX, midY, x, y);
+
+			addQuadSegment(path, from, to, x, y, prevX, prevY);
 			from = to;
 			prevX = x;
 			prevY = y;
 		}
 
 		if (length >= 3) {
-			int interval = intervalClass(first, from);
-			float stiffness = 1 - interval / 6.0f;
-			float midX = (firstX + prevX) * 0.5f * stiffness;
-			float midY = (firstY + prevY) * 0.5f * stiffness;
-			path.quadTo(midX, midY, firstX, firstY);
+			addQuadSegment(path, from, first, firstX, firstY, prevX, prevY);
 		}
 
 		canvas.drawPath(path, chordPaint);
+	}
+
+	private void addQuadSegment(Path path, int from, int to, float x, float y,
+		float prevX, float prevY) {
+		int interval = intervalClass(from, to);
+		float stiffness = 1 - interval / 6.0f;
+		float midX = (x + prevX) * 0.5f * stiffness;
+		float midY = (y + prevY) * 0.5f * stiffness;
+		path.quadTo(midX, midY, x, y);
 	}
 
 	private int intervalClass(int one, int other) {
@@ -190,6 +177,20 @@ public class ToneCircleView extends View {
 		return ((value % base) + base) % base;
 	}
 
+	private void drawActiveChordAsPolygon(Canvas canvas) {
+		int length = activeTones.cardinality();
+		int first = activeTones.nextSetBit(0);
+		int from = first;
+		for (int i = 1; i < length; i++) {
+			int to = activeTones.nextSetBit(from + 1);
+			drawPolygonLine(canvas, from, to);
+			from = to;
+		}
+		if (length >= 3) {
+			drawPolygonLine(canvas, from, first);
+		}
+	}
+
 	private void drawPolygonLine(Canvas canvas, int from, int to) {
 		float fromX = beadApexPoints[2 * from];
 		float fromY = beadApexPoints[2 * from + 1];
@@ -198,6 +199,13 @@ public class ToneCircleView extends View {
 		canvas.drawLine(fromX, fromY, toX, toY, activeBeadPaint);
 		drawBeadApex(canvas, 2 * from, 2 * from + 1);
 		drawBeadApex(canvas, 2 * to, 2 * to + 1);
+	}
+
+	private void drawBeadApex(Canvas canvas, int xIndex, int yIndex) {
+		canvas.drawCircle(beadApexPoints[xIndex],
+			beadApexPoints[yIndex],
+			10f,
+			chordPaint);
 	}
 
 	@Override
