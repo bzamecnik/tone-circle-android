@@ -44,7 +44,8 @@ public class ToneCircleView extends View {
 	private float beadRadius;
 	private float bigRadius;
 
-	private Integer touchedTone;
+	private SingleDragNDropDetector dndDetector;
+	private RotationGestureDetector rotationDetector;
 
 	public ToneCircleView(Context context, AttributeSet attrs) {
 		super(context, attrs);
@@ -70,6 +71,35 @@ public class ToneCircleView extends View {
 		chordPaint = new Paint(activeBeadPaint);
 		chordPaint.setStyle(Style.STROKE);
 		chordPaint.setStrokeWidth(5);
+
+		dndDetector = new SingleDragNDropDetector(new OnDragNDropListener() {
+			@Override
+			public void onDrop(Integer sourceTone, Integer targetTone) {
+				if (targetTone == null) {
+					activeTones.clear(sourceTone);
+				} else if (targetTone.equals(sourceTone)) {
+					activeTones.flip(targetTone);
+				} else if (sourceTone != null && activeTones.get(sourceTone)) {
+					activeTones.set(targetTone, activeTones.get(sourceTone));
+					activeTones.clear(sourceTone);
+				}
+				invalidate();
+			}
+		});
+
+		rotationDetector = new RotationGestureDetector(
+			new OnRotationGestureListener() {
+				@Override
+				public void onRotation(BitSet origActiveTones, float angle) {
+					int translation = mod((int) Math.round(angle / 360.0
+						* TONE_COUNT),
+						TONE_COUNT);
+					if (translation != 0) {
+						activeTones = translate(origActiveTones, translation);
+						invalidate();
+					}
+				}
+			});
 	}
 
 	public BitSet getActiveTones() {
@@ -177,6 +207,19 @@ public class ToneCircleView extends View {
 		return ((value % base) + base) % base;
 	}
 
+	// not very efficient
+	protected BitSet translate(BitSet activeTones, int translation) {
+		BitSet newBits = new BitSet(TONE_COUNT);
+		int length = activeTones.cardinality();
+		int prev = 0;
+		for (int i = 0; i < length; i++) {
+			int index = activeTones.nextSetBit(prev);
+			newBits.set(mod(index - translation, TONE_COUNT));
+			prev = index + 1;
+		}
+		return newBits;
+	}
+
 	private void drawActiveChordAsPolygon(Canvas canvas) {
 		int length = activeTones.cardinality();
 		int first = activeTones.nextSetBit(0);
@@ -240,45 +283,144 @@ public class ToneCircleView extends View {
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
-		int pointerIndex = event.getActionIndex();
-		float x = event.getX(pointerIndex);
-		float y = event.getY(pointerIndex);
-		switch (event.getActionMasked()) {
-		case MotionEvent.ACTION_DOWN:
-			touchedTone = getHoveredTone(x, y);
-			invalidate();
-			break;
-		case MotionEvent.ACTION_UP:
-			if (touchedTone != null) {
-				Integer hoveredTone = getHoveredTone(x, y);
-				if (hoveredTone == null) {
-					activeTones.clear(touchedTone);
-				} else if (hoveredTone.equals(touchedTone)) {
-					activeTones.flip(hoveredTone);
-				} else {
-					activeTones.set(hoveredTone, activeTones.get(touchedTone));
-					activeTones.clear(touchedTone);
-				}
-				touchedTone = null;
-				invalidate();
-			}
-			break;
+		if (rotationDetector.onTouchEvent(event)) {
+			return true;
 		}
-
+		dndDetector.onTouchEvent(event);
 		return true;
 	}
 
-	private Integer getHoveredTone(float x, float y) {
-		float cy = y - height * 0.5f;
-		double cx = x - width * 0.5;
-		double angle = Math.atan2(cy, cx);
-		double radius = Math.sqrt(cx * cx + cy * cy);
-		if (radius < bigRadius - beadRadius || radius > bigRadius + beadRadius) {
-			return null;
+	private class SingleDragNDropDetector {
+
+		private Integer touchedTone;
+
+		private OnDragNDropListener listener;
+
+		public SingleDragNDropDetector(OnDragNDropListener listener) {
+			this.listener = listener;
 		}
-		int index = (int) (Math
-			.round(((angle + HALF_PI) / TWO_PI) * TONE_COUNT));
-		return (index + TONE_COUNT) % TONE_COUNT;
+
+		public boolean onTouchEvent(MotionEvent event) {
+			if (listener == null) {
+				return false;
+			}
+			int pointerIndex = event.getActionIndex();
+			float x = event.getX(pointerIndex);
+			float y = event.getY(pointerIndex);
+			switch (event.getActionMasked()) {
+			case MotionEvent.ACTION_DOWN:
+				touchedTone = getHoveredTone(x, y);
+				break;
+			case MotionEvent.ACTION_UP:
+				if (touchedTone != null) {
+					Integer hoveredTone = getHoveredTone(x, y);
+					listener.onDrop(touchedTone, hoveredTone);
+					touchedTone = null;
+				}
+				break;
+			}
+			return false;
+		}
+
+		private Integer getHoveredTone(float x, float y) {
+			float cy = y - height * 0.5f;
+			double cx = x - width * 0.5;
+			double angle = Math.atan2(cy, cx);
+			double radius = Math.sqrt(cx * cx + cy * cy);
+			if (radius < bigRadius - beadRadius
+				|| radius > bigRadius + beadRadius) {
+				return null;
+			}
+			int index = (int) (Math.round(((angle + HALF_PI) / TWO_PI)
+				* TONE_COUNT));
+			return (index + TONE_COUNT) % TONE_COUNT;
+		}
+
 	}
 
+	private interface OnDragNDropListener {
+		void onDrop(Integer sourceTone, Integer targetTone);
+	}
+
+	// http://stackoverflow.com/questions/10682019/android-two-finger-rotation
+	public class RotationGestureDetector {
+		private float fX, fY, sX, sY;
+		private Integer ptrId1, ptrId2;
+		private float angle;
+		
+		private BitSet origActiveTones;
+
+		private OnRotationGestureListener listener;
+
+		public RotationGestureDetector(OnRotationGestureListener listener) {
+			this.listener = listener;
+		}
+
+		public boolean onTouchEvent(MotionEvent event) {
+			if (listener == null) {
+				return false;
+			}
+			switch (event.getActionMasked()) {
+			case MotionEvent.ACTION_DOWN:
+				ptrId1 = event.getPointerId(event.getActionIndex());
+				break;
+			case MotionEvent.ACTION_POINTER_DOWN:
+				ptrId2 = event.getPointerId(event.getActionIndex());
+				sX = event.getX(event.findPointerIndex(ptrId1));
+				sY = event.getY(event.findPointerIndex(ptrId1));
+				fX = event.getX(event.findPointerIndex(ptrId2));
+				fY = event.getY(event.findPointerIndex(ptrId2));
+				origActiveTones = activeTones;
+				break;
+			case MotionEvent.ACTION_MOVE:
+				if (ptrId1 != null && ptrId2 != null) {
+					float nfX, nfY, nsX, nsY;
+					nsX = event.getX(event.findPointerIndex(ptrId1));
+					nsY = event.getY(event.findPointerIndex(ptrId1));
+					nfX = event.getX(event.findPointerIndex(ptrId2));
+					nfY = event.getY(event.findPointerIndex(ptrId2));
+
+					angle = angleBetweenLines(fX,
+						fY,
+						sX,
+						sY,
+						nfX,
+						nfY,
+						nsX,
+						nsY);
+
+					listener.onRotation(origActiveTones, angle);
+					return true;
+				}
+				break;
+			case MotionEvent.ACTION_UP:
+				ptrId1 = null;
+				origActiveTones = null;
+				break;
+			case MotionEvent.ACTION_POINTER_UP:
+				ptrId2 = null;
+				break;
+			}
+			return false;
+		}
+
+		private float angleBetweenLines(float fX, float fY, float sX, float sY,
+			float nfX, float nfY, float nsX, float nsY) {
+			float angle1 = (float) Math.atan2((fY - sY), (fX - sX));
+			float angle2 = (float) Math.atan2((nfY - nsY), (nfX - nsX));
+
+			float angle = ((float) Math.toDegrees(angle1 - angle2)) % 360;
+			if (angle < -180.f) {
+				angle += 360.0f;
+			}
+			if (angle > 180.f) {
+				angle -= 360.0f;
+			}
+			return angle;
+		}
+	}
+
+	public static interface OnRotationGestureListener {
+		public void onRotation(BitSet origActiveTones, float angle);
+	}
 }
