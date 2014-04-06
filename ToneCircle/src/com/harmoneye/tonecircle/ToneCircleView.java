@@ -1,11 +1,13 @@
 package com.harmoneye.tonecircle;
 
+import java.util.ArrayList;
 import java.util.BitSet;
 
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.PointF;
 import android.graphics.Paint.Align;
 import android.graphics.Paint.Style;
 import android.graphics.Path;
@@ -25,12 +27,9 @@ public class ToneCircleView extends View {
 		"F", "Gb", "G", "Ab", "A", "Bb", "B" };
 
 	// the model
-	BitSet activeTones = new BitSet(TONE_COUNT);
+	private BitSet activeTones = new BitSet(TONE_COUNT);
 
-	// x, y coordinates of bead centers
-	float[] centers = new float[TONE_COUNT * 2];
-	// x, y coordinates of connection points
-	float[] beadApexPoints = new float[TONE_COUNT * 2];
+	private ArrayList<Bead> beads;
 
 	private Paint textPaint;
 	private Paint beadPaint;
@@ -39,10 +38,7 @@ public class ToneCircleView extends View {
 
 	private Rect textRect = new Rect();
 
-	private int width;
-	private int height;
-	private float beadRadius;
-	private float bigRadius;
+	private ChordPath chordPath;
 
 	private SingleDragNDropDetector dndDetector;
 	private RotationGestureDetector rotationDetector;
@@ -72,6 +68,13 @@ public class ToneCircleView extends View {
 		chordPaint.setStyle(Style.STROKE);
 		chordPaint.setStrokeWidth(5);
 
+		beads = new ArrayList<Bead>(TONE_COUNT);
+		for (int i = 0; i < TONE_COUNT; i++) {
+			beads.add(new Bead(new PointF(0, 0), new PointF(0, 0), 0));
+		}
+
+		chordPath = new ChordPath();
+
 		dndDetector = new SingleDragNDropDetector(new OnDragNDropListener() {
 			@Override
 			public void onDrop(Integer sourceTone, Integer targetTone) {
@@ -91,11 +94,11 @@ public class ToneCircleView extends View {
 			new OnRotationGestureListener() {
 				@Override
 				public void onRotation(BitSet origActiveTones, float angle) {
-					int translation = mod((int) Math.round(angle / 360.0
-						* TONE_COUNT),
+					int translation = Modulo.modulo((int) Math.round(angle
+						/ 360.0 * TONE_COUNT),
 						TONE_COUNT);
 					if (translation != 0) {
-						activeTones = translate(origActiveTones, translation);
+						activeTones = transpose(origActiveTones, translation);
 						invalidate();
 					}
 				}
@@ -122,133 +125,39 @@ public class ToneCircleView extends View {
 
 		canvas.translate(0.5f * width, 0.5f * height);
 
-		textPaint.setTextSize(beadRadius);
-
-		for (int i = 0, xIndex = 0; i < TONE_COUNT; i++, xIndex += 2) {
-			int yIndex = xIndex + 1;
-			float x = centers[xIndex];
-			float y = centers[yIndex];
-			canvas.drawCircle(x,
-				y,
-				beadRadius,
-				activeTones.get(i) ? activeBeadPaint : beadPaint);
-
-			String toneName = TONE_NAMES[i];
-			textPaint.getTextBounds(toneName, 0, toneName.length(), textRect);
-			canvas.drawText(toneName,
-				x,
-				y + textRect.height() * 0.5f,
-				textPaint);
-
-			// drawBeadApex(canvas, xIndex, yIndex);
-		}
-
-		drawActiveChord(canvas);
+		drawBeadCircle(canvas);
+		chordPath.draw(canvas);
 
 		canvas.restore();
 	}
 
-	private void drawActiveChord(Canvas canvas) {
-		// drawActiveChordAsPolygon(canvas);
-		drawActiveChordAsQuadPath(canvas);
-	}
+	private void drawBeadCircle(Canvas canvas) {
+		for (int i = 0; i < TONE_COUNT; i++) {
+			Bead bead = beads.get(i);
+			PointF center = bead.getCenter();
+			canvas.drawCircle(center.x,
+				center.y,
+				bead.getRadius(),
+				activeTones.get(i) ? activeBeadPaint : beadPaint);
 
-	private void drawActiveChordAsQuadPath(Canvas canvas) {
-		Path path = new Path();
-
-		int length = activeTones.cardinality();
-		if (length <= 1) {
-			return;
+			String toneName = getToneName(i);
+			textPaint.getTextBounds(toneName, 0, toneName.length(), textRect);
+			canvas.drawText(toneName, center.x, center.y + textRect.height()
+				* 0.5f, textPaint);
 		}
-
-		chordPaint.setStyle(length > 2 ? Style.FILL_AND_STROKE : Style.STROKE);
-
-		int first = activeTones.nextSetBit(0);
-		int from = first;
-		float firstX = beadApexPoints[2 * first];
-		float firstY = beadApexPoints[2 * first + 1];
-		path.moveTo(firstX, firstY);
-		float prevX = firstX;
-		float prevY = firstY;
-		for (int i = 1; i < length; i++) {
-			int to = activeTones.nextSetBit(from + 1);
-			float x = beadApexPoints[2 * to];
-			float y = beadApexPoints[2 * to + 1];
-
-			addQuadSegment(path, from, to, x, y, prevX, prevY);
-			from = to;
-			prevX = x;
-			prevY = y;
-		}
-
-		if (length >= 3) {
-			addQuadSegment(path, from, first, firstX, firstY, prevX, prevY);
-		}
-
-		canvas.drawPath(path, chordPaint);
-	}
-
-	private void addQuadSegment(Path path, int from, int to, float x, float y,
-		float prevX, float prevY) {
-		int interval = intervalClass(from, to);
-		float stiffness = 1 - interval / 6.0f;
-		float midX = (x + prevX) * 0.5f * stiffness;
-		float midY = (y + prevY) * 0.5f * stiffness;
-		path.quadTo(midX, midY, x, y);
-	}
-
-	private int intervalClass(int one, int other) {
-		int interval = mod(one - other, TONE_COUNT);
-		int HALF = TONE_COUNT / 2;
-		return (interval > HALF) ? TONE_COUNT - interval : interval;
-	}
-
-	private int mod(int value, int base) {
-		return ((value % base) + base) % base;
 	}
 
 	// not very efficient
-	protected BitSet translate(BitSet activeTones, int translation) {
+	protected BitSet transpose(BitSet activeTones, int transposition) {
 		BitSet newBits = new BitSet(TONE_COUNT);
 		int length = activeTones.cardinality();
 		int prev = 0;
 		for (int i = 0; i < length; i++) {
 			int index = activeTones.nextSetBit(prev);
-			newBits.set(mod(index - translation, TONE_COUNT));
+			newBits.set(Modulo.modulo(index - transposition, TONE_COUNT));
 			prev = index + 1;
 		}
 		return newBits;
-	}
-
-	private void drawActiveChordAsPolygon(Canvas canvas) {
-		int length = activeTones.cardinality();
-		int first = activeTones.nextSetBit(0);
-		int from = first;
-		for (int i = 1; i < length; i++) {
-			int to = activeTones.nextSetBit(from + 1);
-			drawPolygonLine(canvas, from, to);
-			from = to;
-		}
-		if (length >= 3) {
-			drawPolygonLine(canvas, from, first);
-		}
-	}
-
-	private void drawPolygonLine(Canvas canvas, int from, int to) {
-		float fromX = beadApexPoints[2 * from];
-		float fromY = beadApexPoints[2 * from + 1];
-		float toX = beadApexPoints[2 * to];
-		float toY = beadApexPoints[2 * to + 1];
-		canvas.drawLine(fromX, fromY, toX, toY, activeBeadPaint);
-		drawBeadApex(canvas, 2 * from, 2 * from + 1);
-		drawBeadApex(canvas, 2 * to, 2 * to + 1);
-	}
-
-	private void drawBeadApex(Canvas canvas, int xIndex, int yIndex) {
-		canvas.drawCircle(beadApexPoints[xIndex],
-			beadApexPoints[yIndex],
-			10f,
-			chordPaint);
 	}
 
 	@Override
@@ -256,29 +165,32 @@ public class ToneCircleView extends View {
 		// float xpad = (float) (getPaddingLeft() + getPaddingRight());
 		// float ypad = (float) (getPaddingTop() + getPaddingBottom());
 
-		width = w;
-		height = h;
-
 		float windowRadius = 0.5f * (float) Math.min(w, h);
-		beadRadius = 0.19f * windowRadius;
-		bigRadius = 0.8f * windowRadius;
+		float beadRadius = 0.19f * windowRadius;
+		float bigRadius = 0.8f * windowRadius;
 		float apexRadius = bigRadius - beadRadius;
 		// apexRadius *= 0.9f;
 
 		float toneCountInv = 1.0f / TONE_COUNT;
-		for (int i = 0, xIndex = 0; i < TONE_COUNT; i++, xIndex += 2) {
-			int yIndex = xIndex + 1;
+		for (int i = 0; i < TONE_COUNT; i++) {
 			float p = i * toneCountInv;
 
 			double angle = p * TWO_PI - HALF_PI;
 			float x = (float) Math.cos(angle);
 			float y = (float) Math.sin(angle);
-			centers[xIndex] = bigRadius * x;
-			centers[yIndex] = bigRadius * y;
 
-			beadApexPoints[xIndex] = apexRadius * x;
-			beadApexPoints[yIndex] = apexRadius * y;
+			PointF center = new PointF(bigRadius * x, bigRadius * y);
+			PointF apex = new PointF(apexRadius * x, apexRadius * y);
+			Bead bead = new Bead(center, apex, beadRadius);
+			beads.set(i, bead);
 		}
+
+		textPaint.setTextSize(beadRadius);
+
+		dndDetector.setWidth(w);
+		dndDetector.setHeight(h);
+		dndDetector.setBigRadius(bigRadius);
+		dndDetector.setBeadRadius(beadRadius);
 	}
 
 	@Override
@@ -290,11 +202,20 @@ public class ToneCircleView extends View {
 		return true;
 	}
 
-	private class SingleDragNDropDetector {
+	private String getToneName(int i) {
+		return TONE_NAMES[i];
+	}
+
+	private static class SingleDragNDropDetector {
+
+		private OnDragNDropListener listener;
 
 		private Integer touchedTone;
 
-		private OnDragNDropListener listener;
+		private int width;
+		private int height;
+		private float bigRadius;
+		private float beadRadius;
 
 		public SingleDragNDropDetector(OnDragNDropListener listener) {
 			this.listener = listener;
@@ -322,6 +243,22 @@ public class ToneCircleView extends View {
 			return false;
 		}
 
+		public void setWidth(int width) {
+			this.width = width;
+		}
+
+		public void setHeight(int height) {
+			this.height = height;
+		}
+
+		public void setBigRadius(float bigRadius) {
+			this.bigRadius = bigRadius;
+		}
+
+		public void setBeadRadius(float beadRadius) {
+			this.beadRadius = beadRadius;
+		}
+
 		private Integer getHoveredTone(float x, float y) {
 			float cy = y - height * 0.5f;
 			double cx = x - width * 0.5;
@@ -347,7 +284,7 @@ public class ToneCircleView extends View {
 		private float fX, fY, sX, sY;
 		private Integer ptrId1, ptrId2;
 		private float angle;
-		
+
 		private BitSet origActiveTones;
 
 		private OnRotationGestureListener listener;
@@ -410,17 +347,97 @@ public class ToneCircleView extends View {
 			float angle2 = (float) Math.atan2((nfY - nsY), (nfX - nsX));
 
 			float angle = ((float) Math.toDegrees(angle1 - angle2)) % 360;
-			if (angle < -180.f) {
-				angle += 360.0f;
-			}
-			if (angle > 180.f) {
-				angle -= 360.0f;
-			}
 			return angle;
 		}
 	}
 
 	public static interface OnRotationGestureListener {
 		public void onRotation(BitSet origActiveTones, float angle);
+	}
+
+	private static class Bead {
+		private PointF center;
+		// connection point for the curves joining the beads inside the circle
+		private PointF apex;
+		private float radius;
+
+		public Bead(PointF center, PointF apex, float radius) {
+			this.center = center;
+			this.apex = apex;
+			this.radius = radius;
+		}
+
+		public PointF getCenter() {
+			return center;
+		}
+
+		public PointF getApex() {
+			return apex;
+		}
+
+		public float getRadius() {
+			return radius;
+		}
+	}
+
+	private class ChordPath {
+		public void draw(Canvas canvas) {
+			Path path = new Path();
+
+			int length = activeTones.cardinality();
+			if (length <= 1) {
+				return;
+			}
+
+			chordPaint.setStyle(length > 2 ? Style.FILL_AND_STROKE
+				: Style.STROKE);
+
+			int first = activeTones.nextSetBit(0);
+			int from = first;
+			PointF firstApex = beads.get(first).getApex();
+			path.moveTo(firstApex.x, firstApex.y);
+			PointF prevApex = firstApex;
+			for (int i = 1; i < length; i++) {
+				int to = activeTones.nextSetBit(from + 1);
+				PointF apex = beads.get(to).getApex();
+				addQuadSegment(path,
+					from,
+					to,
+					apex.x,
+					apex.y,
+					prevApex.x,
+					prevApex.y);
+				from = to;
+				prevApex = apex;
+			}
+
+			if (length >= 3) {
+				addQuadSegment(path,
+					from,
+					first,
+					firstApex.x,
+					firstApex.y,
+					prevApex.x,
+					prevApex.y);
+			}
+
+			canvas.drawPath(path, chordPaint);
+		}
+
+		private void addQuadSegment(Path path, int from, int to, float x,
+			float y, float prevX, float prevY) {
+			int interval = intervalClass(from, to);
+			float stiffness = 1 - interval / 6.0f;
+			float midX = (x + prevX) * 0.5f * stiffness;
+			float midY = (y + prevY) * 0.5f * stiffness;
+			path.quadTo(midX, midY, x, y);
+		}
+
+		private int intervalClass(int one, int other) {
+			int interval = Modulo.modulo(one - other, TONE_COUNT);
+			int HALF = TONE_COUNT / 2;
+			return (interval > HALF) ? TONE_COUNT - interval : interval;
+		}
+
 	}
 }
