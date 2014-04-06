@@ -26,6 +26,8 @@ public class ToneCircleView extends View {
 	private static final String[] TONE_NAMES = { "C", "Db", "D", "Eb", "E",
 		"F", "Gb", "G", "Ab", "A", "Bb", "B" };
 
+	private static final int BACKGROUND_COLOR = Color.WHITE;
+
 	// the model
 	private BitSet activeTones = new BitSet(TONE_COUNT);
 
@@ -47,7 +49,7 @@ public class ToneCircleView extends View {
 		super(context, attrs);
 
 		textPaint = new Paint();
-		textPaint.setColor(Color.WHITE);
+		textPaint.setColor(BACKGROUND_COLOR);
 		textPaint.setTextAlign(Align.CENTER);
 		textPaint.setAntiAlias(true);
 
@@ -119,7 +121,7 @@ public class ToneCircleView extends View {
 		int width = canvas.getWidth();
 		int height = canvas.getHeight();
 
-		canvas.drawColor(Color.WHITE);
+		canvas.drawColor(BACKGROUND_COLOR);
 
 		canvas.save();
 
@@ -162,10 +164,13 @@ public class ToneCircleView extends View {
 
 	@Override
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
-		// float xpad = (float) (getPaddingLeft() + getPaddingRight());
-		// float ypad = (float) (getPaddingTop() + getPaddingBottom());
+		float xpad = (float) (getPaddingLeft() + getPaddingRight());
+		float ypad = (float) (getPaddingTop() + getPaddingBottom());
 
-		float windowRadius = 0.5f * (float) Math.min(w, h);
+		float width = w - xpad;
+		float height = h - ypad;
+
+		float windowRadius = 0.5f * (float) Math.min(width, height);
 		float beadRadius = 0.19f * windowRadius;
 		float bigRadius = 0.8f * windowRadius;
 		float apexRadius = bigRadius - beadRadius;
