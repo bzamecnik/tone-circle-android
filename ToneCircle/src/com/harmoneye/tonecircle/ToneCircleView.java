@@ -2,6 +2,7 @@ package com.harmoneye.tonecircle;
 
 import java.util.ArrayList;
 import java.util.BitSet;
+import java.util.List;
 
 import android.content.Context;
 import android.graphics.Canvas;
@@ -29,7 +30,7 @@ public class ToneCircleView extends View {
 	private static final int BACKGROUND_COLOR = Color.WHITE;
 
 	// the model
-	private BitSet activeTones = new BitSet(TONE_COUNT);
+	private PitchClassSet activeTones = new PitchClassSet();
 
 	private ArrayList<Bead> beads;
 
@@ -81,12 +82,13 @@ public class ToneCircleView extends View {
 			@Override
 			public void onDrop(Integer sourceTone, Integer targetTone) {
 				if (targetTone == null) {
-					activeTones.clear(sourceTone);
+					activeTones = activeTones.clear(sourceTone);
 				} else if (targetTone.equals(sourceTone)) {
-					activeTones.flip(targetTone);
+					activeTones = activeTones.flip(targetTone);
 				} else if (sourceTone != null && activeTones.get(sourceTone)) {
-					activeTones.set(targetTone, activeTones.get(sourceTone));
-					activeTones.clear(sourceTone);
+					activeTones = activeTones.set(targetTone,
+						activeTones.get(sourceTone));
+					activeTones = activeTones.clear(sourceTone);
 				}
 				invalidate();
 			}
@@ -95,23 +97,24 @@ public class ToneCircleView extends View {
 		rotationDetector = new RotationGestureDetector(
 			new OnRotationGestureListener() {
 				@Override
-				public void onRotation(BitSet origActiveTones, float angle) {
-					int translation = Modulo.modulo((int) Math.round(angle
+				public void onRotation(PitchClassSet origActiveTones,
+					float angle) {
+					int translation = -Modulo.modulo((int) Math.round(angle
 						/ 360.0 * TONE_COUNT),
 						TONE_COUNT);
 					if (translation != 0) {
-						activeTones = transpose(origActiveTones, translation);
+						activeTones = origActiveTones.transpose(translation);
 						invalidate();
 					}
 				}
 			});
 	}
 
-	public BitSet getActiveTones() {
+	public PitchClassSet getActiveTones() {
 		return activeTones;
 	}
 
-	public void setActiveTones(BitSet activeTones) {
+	public void setActiveTones(PitchClassSet activeTones) {
 		this.activeTones = activeTones;
 		invalidate();
 	}
@@ -290,7 +293,7 @@ public class ToneCircleView extends View {
 		private Integer ptrId1, ptrId2;
 		private float angle;
 
-		private BitSet origActiveTones;
+		private PitchClassSet origActiveTones;
 
 		private OnRotationGestureListener listener;
 
@@ -357,7 +360,7 @@ public class ToneCircleView extends View {
 	}
 
 	public static interface OnRotationGestureListener {
-		public void onRotation(BitSet origActiveTones, float angle);
+		public void onRotation(PitchClassSet origActiveTones, float angle);
 	}
 
 	private static class Bead {
@@ -397,13 +400,14 @@ public class ToneCircleView extends View {
 			chordPaint.setStyle(length > 2 ? Style.FILL_AND_STROKE
 				: Style.STROKE);
 
-			int first = activeTones.nextSetBit(0);
+			List<Integer> activeTonesList = activeTones.asList();
+			int first = activeTonesList.get(0);
 			int from = first;
 			PointF firstApex = beads.get(first).getApex();
 			path.moveTo(firstApex.x, firstApex.y);
 			PointF prevApex = firstApex;
 			for (int i = 1; i < length; i++) {
-				int to = activeTones.nextSetBit(from + 1);
+				int to = activeTonesList.get(i);
 				PointF apex = beads.get(to).getApex();
 				addQuadSegment(path,
 					from,
