@@ -1,8 +1,9 @@
-package com.harmoneye.tonecircle;
-
-import static org.junit.Assert.*;
+package com.harmoneye.tonecircle.test;
 
 import org.junit.Test;
+
+import static org.junit.Assert.*;
+import com.harmoneye.tonecircle.PitchClassSet;
 
 public class PitchClassSetTest {
 
