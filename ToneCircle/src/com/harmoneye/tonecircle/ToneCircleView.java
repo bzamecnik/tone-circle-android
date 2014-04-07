@@ -8,14 +8,16 @@ import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
-import android.graphics.PointF;
 import android.graphics.Paint.Align;
 import android.graphics.Paint.Style;
 import android.graphics.Path;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
 import android.view.View;
+
+import com.buzzingandroid.ui.ViewAspectRatioMeasurer;
 
 public class ToneCircleView extends View {
 
@@ -47,6 +49,8 @@ public class ToneCircleView extends View {
 	private RotationGestureDetector rotationDetector;
 
 	private OnTonesChangedListener listener;
+
+	private ViewAspectRatioMeasurer measurer = new ViewAspectRatioMeasurer(1.0);
 
 	private float width;
 
@@ -211,17 +215,13 @@ public class ToneCircleView extends View {
 		dndDetector.setBigRadius(bigRadius);
 		dndDetector.setBeadRadius(beadRadius);
 	}
-	
+
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
-		int size = Math.min(widthMeasureSpec, heightMeasureSpec);
-		if (widthMeasureSpec <= 0) {
-			size = heightMeasureSpec;
-		} else if (heightMeasureSpec <= 0) {
-			size = widthMeasureSpec;
-		}
-
-		setMeasuredDimension(size, size);
+		measurer.measure(widthMeasureSpec, heightMeasureSpec);
+		int w = measurer.getMeasuredWidth();
+		int h = measurer.getMeasuredHeight();
+		setMeasuredDimension(w, h);
 	}
 
 	@Override
