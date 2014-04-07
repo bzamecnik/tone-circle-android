@@ -46,6 +46,8 @@ public class ToneCircleView extends View {
 	private SingleDragNDropDetector dndDetector;
 	private RotationGestureDetector rotationDetector;
 
+	private OnTonesChangedListener listener;
+
 	public ToneCircleView(Context context, AttributeSet attrs) {
 		super(context, attrs);
 
@@ -82,15 +84,14 @@ public class ToneCircleView extends View {
 			@Override
 			public void onDrop(Integer sourceTone, Integer targetTone) {
 				if (targetTone == null) {
-					activeTones = activeTones.clear(sourceTone);
+					setActiveTones(activeTones.clear(sourceTone));
 				} else if (targetTone.equals(sourceTone)) {
-					activeTones = activeTones.flip(targetTone);
+					setActiveTones(activeTones.flip(targetTone));
 				} else if (sourceTone != null && activeTones.get(sourceTone)) {
-					activeTones = activeTones.set(targetTone,
+					PitchClassSet tones = activeTones.set(targetTone,
 						activeTones.get(sourceTone));
-					activeTones = activeTones.clear(sourceTone);
+					setActiveTones(tones.clear(sourceTone));
 				}
-				invalidate();
 			}
 		});
 
@@ -103,8 +104,7 @@ public class ToneCircleView extends View {
 						/ 360.0 * TONE_COUNT),
 						TONE_COUNT);
 					if (translation != 0) {
-						activeTones = origActiveTones.transpose(translation);
-						invalidate();
+						setActiveTones(origActiveTones.transpose(translation));
 					}
 				}
 			});
@@ -116,7 +116,14 @@ public class ToneCircleView extends View {
 
 	public void setActiveTones(PitchClassSet activeTones) {
 		this.activeTones = activeTones;
+		if (listener != null) {
+			listener.onTonesChanged(activeTones);
+		}
 		invalidate();
+	}
+
+	public void setOnTonesChangedListener(OnTonesChangedListener listener) {
+		this.listener = listener;
 	}
 
 	@Override
@@ -200,6 +207,18 @@ public class ToneCircleView extends View {
 		dndDetector.setBigRadius(bigRadius);
 		dndDetector.setBeadRadius(beadRadius);
 	}
+	
+	@Override
+	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
+		int size = Math.min(widthMeasureSpec, heightMeasureSpec);
+		if (widthMeasureSpec <= 0) {
+			size = heightMeasureSpec;
+		} else if (heightMeasureSpec <= 0) {
+			size = widthMeasureSpec;
+		}
+
+		setMeasuredDimension(size, size);
+	}
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
@@ -212,6 +231,10 @@ public class ToneCircleView extends View {
 
 	private String getToneName(int i) {
 		return TONE_NAMES[i];
+	}
+
+	public interface OnTonesChangedListener {
+		public void onTonesChanged(PitchClassSet activeTones);
 	}
 
 	private static class SingleDragNDropDetector {
