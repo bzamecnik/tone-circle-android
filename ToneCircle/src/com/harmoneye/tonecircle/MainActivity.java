@@ -12,6 +12,8 @@ public class MainActivity extends Activity {
 
 	private static final String ACTIVE_TONES = "active_tones";
 
+	private static final int DEFAULT_TONE_SET = PitchClassSet.fromArray(0, 4, 7).getIndex();
+
 	private PitchClassSetNamer namer;
 	private ToneCircleView toneCircleView;
 
@@ -37,10 +39,8 @@ public class MainActivity extends Activity {
 	@Override
 	protected void onResume() {
 		SharedPreferences prefs = getPreferences(MODE_PRIVATE);
-		int activeTones = prefs.getInt(ACTIVE_TONES, 0);
-		if (activeTones > 0) {
-			toneCircleView.setActiveTones(PitchClassSet.fromIndex(activeTones));
-		}
+		int activeTones = prefs.getInt(ACTIVE_TONES, DEFAULT_TONE_SET);
+		toneCircleView.setActiveTones(PitchClassSet.fromIndex(activeTones));
 		super.onResume();
 	}
 
