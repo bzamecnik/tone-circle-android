@@ -28,9 +28,9 @@
 
 -dontskipnonpubliclibraryclassmembers
 
--keepattributes *Annotation*,EnclosingMethod
+-keepattributes Signature,*Annotation*,EnclosingMethod
 
--keepnames class org.codehaus.jackson.** { *; }
+-keepnames class com.fasterxml.jackson.** { *; }
 
 -dontwarn javax.xml.**
 -dontwarn javax.xml.stream.events.**
