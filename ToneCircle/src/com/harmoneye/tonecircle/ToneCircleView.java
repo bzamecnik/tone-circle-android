@@ -30,7 +30,7 @@ public class ToneCircleView extends View {
 	private static final int BACKGROUND_COLOR = Color.WHITE;
 
 	// the model
-	private PitchClassSet activeTones = new PitchClassSet();
+	private PitchClassSet activeTones = PitchClassSet.empty();
 
 	private ArrayList<Bead> beads;
 
