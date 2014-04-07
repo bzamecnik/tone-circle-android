@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.Menu;
 import android.widget.TextView;
@@ -12,6 +13,9 @@ import android.widget.ToggleButton;
 public class MainActivity extends Activity {
 
 //	private TextView titleView;
+	private static final String ACTIVE_TONES = "active_tones";
+
+	private ToneCircleView toneCircleView;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
@@ -19,6 +23,7 @@ public class MainActivity extends Activity {
 		setContentView(R.layout.activity_main);
 
 //		titleView = (TextView) findViewById(R.id.title);
+		toneCircleView = (ToneCircleView) findViewById(R.id.toneCircle);
 
 //		CircleLayout circle = (CircleLayout) findViewById(R.id.circleLayout);
 //
@@ -40,6 +45,14 @@ public class MainActivity extends Activity {
 //			toggles.add(toggle);
 //			circle.addView(toggle);
 //		}
+	@Override
+	protected void onResume() {
+		SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+		int activeTones = prefs.getInt(ACTIVE_TONES, 0);
+		if (activeTones > 0) {
+			toneCircleView.setActiveTones(PitchClassSet.fromIndex(activeTones));
+		}
+		super.onResume();
 	}
 
 //	protected void updateChordName() {
@@ -51,6 +64,15 @@ public class MainActivity extends Activity {
 //		}
 //		titleView.setText(title.toString());
 //	}
+	@Override
+	protected void onPause() {
+		int activeTones = toneCircleView.getActiveTones().getIndex();
+		SharedPreferences prefs = getPreferences(MODE_PRIVATE);
+		SharedPreferences.Editor editor = prefs.edit();
+		editor.putInt(ACTIVE_TONES, activeTones);
+		editor.commit();
+		super.onPause();
+	}
 
 	@Override
 	public boolean onCreateOptionsMenu(Menu menu) {
