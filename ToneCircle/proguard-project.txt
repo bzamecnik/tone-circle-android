@@ -18,3 +18,20 @@
 #-keepclassmembers class fqcn.of.javascript.interface.for.webview {
 #   public *;
 #}
+
+
+# Jackson
+# http://stackoverflow.com/questions/11029836/problems-with-using-jackson-json-library-when-using-proguard
+-libraryjars libs/jackson-annotations-2.2.3.jar
+-libraryjars libs/jackson-core-2.2.3.jar
+-libraryjars libs/jackson-databind-2.2.3.jar
+
+-dontskipnonpubliclibraryclassmembers
+
+-keepattributes *Annotation*,EnclosingMethod
+
+-keepnames class org.codehaus.jackson.** { *; }
+
+-dontwarn javax.xml.**
+-dontwarn javax.xml.stream.events.**
+-dontwarn com.fasterxml.jackson.databind.**
