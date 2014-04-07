@@ -48,6 +48,10 @@ public class ToneCircleView extends View {
 
 	private OnTonesChangedListener listener;
 
+	private float width;
+
+	private float height;
+
 	public ToneCircleView(Context context, AttributeSet attrs) {
 		super(context, attrs);
 
@@ -128,9 +132,6 @@ public class ToneCircleView extends View {
 
 	@Override
 	protected void onDraw(Canvas canvas) {
-		int width = canvas.getWidth();
-		int height = canvas.getHeight();
-
 		canvas.drawColor(BACKGROUND_COLOR);
 
 		canvas.save();
@@ -176,6 +177,9 @@ public class ToneCircleView extends View {
 	protected void onSizeChanged(int w, int h, int oldw, int oldh) {
 		float xpad = (float) (getPaddingLeft() + getPaddingRight());
 		float ypad = (float) (getPaddingTop() + getPaddingBottom());
+
+		this.width = w;
+		this.height = h;
 
 		float width = w - xpad;
 		float height = h - ypad;
