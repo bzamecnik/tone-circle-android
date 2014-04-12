@@ -18,6 +18,8 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import com.buzzingandroid.ui.ViewAspectRatioMeasurer;
+import com.harmoneye.math.Modulo;
+import com.harmoneye.music.PitchClassSet;
 
 public class ToneCircleView extends View {
 

@@ -6,6 +6,8 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.widget.TextView;
 
+import com.harmoneye.music.PitchClassSet;
+import com.harmoneye.music.PitchClassSetNamer;
 import com.harmoneye.tonecircle.ToneCircleView.OnTonesChangedListener;
 
 public class MainActivity extends Activity {
