@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.widget.TextView;
 
+import com.harmoneye.music.PitchClassNamer;
 import com.harmoneye.music.PitchClassSet;
 import com.harmoneye.music.PitchClassSetNamer;
 import com.harmoneye.tonecircle.ToneCircleView.OnTonesChangedListener;
@@ -24,11 +25,13 @@ public class MainActivity extends Activity {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.activity_main);
 
+		PitchClassNamer pitchClassNamer = PitchClassNamer.defaultInstance();
 		namer = PitchClassSetNamer.fromJson(getResources()
-			.openRawResource(R.raw.chord_names));
+			.openRawResource(R.raw.chord_names), pitchClassNamer);
 
 		final TextView titleView = (TextView) findViewById(R.id.title);
 		toneCircleView = (ToneCircleView) findViewById(R.id.toneCircle);
+		toneCircleView.setPitchClassNamer(pitchClassNamer);
 
 		toneCircleView.setOnTonesChangedListener(new OnTonesChangedListener() {
 			@Override

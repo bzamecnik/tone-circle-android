@@ -19,6 +19,7 @@ import android.view.View;
 
 import com.buzzingandroid.ui.ViewAspectRatioMeasurer;
 import com.harmoneye.math.Modulo;
+import com.harmoneye.music.PitchClassNamer;
 import com.harmoneye.music.PitchClassSet;
 
 public class ToneCircleView extends View {
@@ -27,9 +28,6 @@ public class ToneCircleView extends View {
 
 	private static final double TWO_PI = 2 * Math.PI;
 	private static final double HALF_PI = 0.5 * Math.PI;
-
-	private static final String[] TONE_NAMES = { "C", "Db", "D", "Eb", "E",
-		"F", "Gb", "G", "Ab", "A", "Bb", "B" };
 
 	private static final int BACKGROUND_COLOR = Color.WHITE;
 
@@ -54,6 +52,8 @@ public class ToneCircleView extends View {
 
 	private ViewAspectRatioMeasurer measurer = new ViewAspectRatioMeasurer(1.0);
 
+	private PitchClassNamer pitchClassNamer;
+	
 	private float width;
 
 	private float height;
@@ -136,6 +136,10 @@ public class ToneCircleView extends View {
 		this.listener = listener;
 	}
 
+	public void setPitchClassNamer(PitchClassNamer pitchClassNamer) {
+		this.pitchClassNamer = pitchClassNamer;
+	}
+	
 	@Override
 	protected void onDraw(Canvas canvas) {
 		canvas.drawColor(BACKGROUND_COLOR);
@@ -235,8 +239,8 @@ public class ToneCircleView extends View {
 		return true;
 	}
 
-	private String getToneName(int i) {
-		return TONE_NAMES[i];
+	private String getToneName(int pitchClass) {
+		return pitchClassNamer != null ? pitchClassNamer.getName(pitchClass) : "";
 	}
 
 	public interface OnTonesChangedListener {
